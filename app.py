@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import requirements
 
 st.image("Logo.png", width=200)
 
