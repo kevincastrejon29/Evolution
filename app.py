@@ -129,7 +129,135 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
     except Exception as e:
         st.error(f"Error en la lógica de El Salvador (Pestañas): {e}")
         return None
-    
+
+def procesar_expediente_el_salvador(f_inc, f_mae):
+    try:
+        # 1️⃣ Carga del Maestro
+        df_mae = pd.read_excel(f_mae)
+        df_mae.columns = [str(c).strip() for c in df_mae.columns]
+
+        # 2️⃣ Carga Inteligente del archivo de Incorporación (Buscador de Pestañas)
+        hojas_inc = pd.read_excel(f_inc, sheet_name=None)
+        df_inc_per = None
+        df_inc_fam = None
+        
+        for nombre_hoja, df in hojas_inc.items():
+            df.columns = [str(c).strip() for c in df.columns]
+            if "Nro. Documento" in df.columns and "Primer apellido" in df.columns:
+                df_inc_per = df
+            if "Parentesco" in df.columns and "Número de Documento" in df.columns:
+                df_inc_fam = df
+                
+        if df_inc_per is None or df_inc_fam is None:
+            st.error("⚠️ No se encontraron las estructuras esperadas (Personas y Familiares) en el Excel de Incorporación.")
+            return None
+
+        # ========================================================
+        # 🧾 PESTAÑA 1: DATOS GENERALES
+        # ========================================================
+        
+        # Preparar Maestro
+        cols_mae_gen = ["PAIS", "COD PERSONAL", "N° DOCUMENTO", "SEXO"]
+        base_mae_gen = df_mae[[c for c in cols_mae_gen if c in df_mae.columns]].copy()
+        
+        # Preparar Incorporación (Personas)
+        cols_inc_gen = ["Nro. Documento", "Primer nombre", "Segundo nombre", "Primer apellido", "Segundo apellido", 
+                        "Apellido de casada", "Estado civil", "Fecha de nacimiento", "Nacionalidad", "País de nacimiento", 
+                        "Profesión", "Correo personal", "Número de celular", "Teléfono fijo", "Departamento residencia", 
+                        "Municipio residencia", "Dirección completa", "Banco", "Número de cta bancaria", 
+                        "Sistema pensionario", "NUP", "Número de ISSS"]
+        base_inc_per = df_inc_per[[c for c in cols_inc_gen if c in df_inc_per.columns]].copy()
+        
+        # Estandarización y Join
+        base_mae_gen["N° DOCUMENTO"] = base_mae_gen["N° DOCUMENTO"].astype(str).str.strip()
+        base_inc_per["Nro. Documento"] = base_inc_per["Nro. Documento"].astype(str).str.strip()
+        df_gen = pd.merge(base_mae_gen, base_inc_per, left_on="N° DOCUMENTO", right_on="Nro. Documento", how="inner")
+        
+        # Renombrado de Columnas
+        map_gen = {
+            "PAIS": "Pais Empresa", "COD PERSONAL": "Código De Empleado", "Primer nombre": "Primer Nombre",
+            "Segundo nombre": "Segundo Nombre", "Primer apellido": "Primer Apellido", "Segundo apellido": "Segundo Apellido",
+            "Apellido de casada": "Apellido Casada", "SEXO": "Genero", "Estado civil": "EstadoCivil",
+            "Nacionalidad": "Pais Nacionalidad", "Número de cta bancaria": "Cuenta Banco", "Dirección completa": "Dirección",
+            "Departamento residencia": "Departamento Residencia", "Municipio residencia": "Municipio Residencia",
+            "Teléfono fijo": "Telefono", "Número de celular": "Celular", "Correo personal": "eMail Interno",
+            "Profesión": "Profesión (100 caracteres)", "Nro. Documento": "No Identificacion", "Sistema pensionario": "AFP",
+            "País de nacimiento": "Pais Nacimiento", "Número de ISSS": "No Seguro Social"
+        }
+        df_gen = df_gen.rename(columns=map_gen)
+        
+        # Agregar columnas nuevas
+        df_gen["Otros Nombres"] = ""
+        df_gen["Tipo Cuenta Banco"] = "Ahorro"
+        df_gen["No Identificacion Tributaria"] = ""
+        df_gen["Digito Verificador"] = ""
+        
+        # Orden y limpieza final
+        orden_gen = ["Pais Empresa", "Código De Empleado", "Primer Nombre", "Segundo Nombre", "Otros Nombres", "Primer Apellido", "Segundo Apellido", "Apellido Casada", "Genero", "EstadoCivil", "Pais Nacimiento", "Fecha Nacimiento", "Pais Nacionalidad", "Cuenta Banco", "Tipo Cuenta Banco", "Banco", "Dirección", "Departamento Residencia", "Municipio Residencia", "Telefono", "Celular", "eMail Interno", "Profesión (100 caracteres)", "No Identificacion", "No Seguro Social", "No Identificacion Tributaria", "AFP", "NUP", "Digito Verificador"]
+        df_gen = df_gen.reindex(columns=orden_gen)
+
+        # ========================================================
+        # 👨‍👩‍👧 PESTAÑA 2: DEPENDIENTES
+        # ========================================================
+        
+        cols_mae_dep = ["COD PERSONAL", "N° DOCUMENTO"]
+        base_mae_dep = df_mae[[c for c in cols_mae_dep if c in df_mae.columns]].copy()
+        
+        # Búsqueda dinámica de la columna de dependencia económica
+        col_dependencia = next((c for c in df_inc_fam.columns if "¿Cuéntas con familiares que dependen económicamente?" in str(c)), None)
+        
+        cols_inc_fam = ["Número de Documento", "Parentesco", "N° de doc. de derechohabiente", "Fecha de nacimiento", "Nombres completos", "Sexo", "Nivel educativo"]
+        if col_dependencia: cols_inc_fam.append(col_dependencia)
+            
+        base_inc_fam = df_inc_fam[[c for c in cols_inc_fam if c in df_inc_fam.columns]].copy()
+        
+        # Estandarización y Join
+        base_mae_dep["N° DOCUMENTO"] = base_mae_dep["N° DOCUMENTO"].astype(str).str.strip()
+        base_inc_fam["Número de Documento"] = base_inc_fam["Número de Documento"].astype(str).str.strip()
+        df_dep = pd.merge(base_mae_dep, base_inc_fam, left_on="N° DOCUMENTO", right_on="Número de Documento", how="inner")
+        
+        # Renombrado de Columnas
+        map_dep = {
+            "COD PERSONAL": "CodigoEmpleado", "Nombres completos": "nombre", "Sexo": "Género",
+            "N° de doc. de derechohabiente": "No Documento", "Fecha de nacimiento": "FechaNacimiento", "Nivel educativo": "NivelEstudio"
+        }
+        if col_dependencia: map_dep[col_dependencia] = "DependenciaEconomica"
+            
+        df_dep = df_dep.rename(columns=map_dep)
+        
+        # Agregar columnas nuevas
+        for col in ["EstadoCivil", "Trabaja", "LugarTrabajo", "Estudia", "LugarEstudio"]:
+            df_dep[col] = ""
+            
+        # Orden final
+        orden_dep = ["CodigoEmpleado", "Parentesco", "nombre", "Género", "EstadoCivil", "DependenciaEconomica", "FechaNacimiento", "No Documento", "Trabaja", "LugarTrabajo", "Estudia", "NivelEstudio", "LugarEstudio"]
+        df_dep = df_dep.reindex(columns=orden_dep)
+
+        # ========================================================
+        # 📥 GENERACIÓN DEL EXCEL MULTI-HOJA
+        # ========================================================
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_gen.to_excel(writer, index=False, sheet_name='Datos Generales')
+            df_dep.to_excel(writer, index=False, sheet_name='Dependientes')
+            
+            # Autoajuste de celdas para ambas hojas
+            for sheet_name in ['Datos Generales', 'Dependientes']:
+                worksheet = writer.sheets[sheet_name]
+                for col in worksheet.columns:
+                    max_length = 0
+                    column = col[0].column_letter
+                    for cell in col:
+                        try:
+                            if len(str(cell.value)) > max_length: max_length = len(str(cell.value))
+                        except: pass
+                    worksheet.column_dimensions[column].width = (max_length + 2)
+                    
+        return output.getvalue()
+
+    except Exception as e:
+        st.error(f"Error crítico en la plantilla de Expediente (El Salvador): {e}")
+        return None
 
 def procesar_guatemala(f_inc, f_mae, f_req):
     pass
@@ -159,22 +287,33 @@ st.markdown(f"<h1 style='text-align: center; color: {color_naranja};'>Automatiza
 st.markdown(f"<h4 style='text-align: center; color: {color_gris};'>Generador estandarizado de Empleos y Expediente</h4>", unsafe_allow_html=True)
 st.divider()
 
-# --- PASO 1: SELECCIÓN DE PAÍS ---
-st.markdown(f"<h3 style='color: {color_verde};'>1. Selección de País</h3>", unsafe_allow_html=True)
-st.write("Selecciona el país correspondiente para aplicar las reglas de transformación adecuadas.")
+# --- PASO 1: SELECCIÓN DE SOCIEDAD ---
+st.markdown(f"<h3 style='color: {color_verde};'>1. Selección de Sociedad</h3>", unsafe_allow_html=True)
+st.write("Selecciona la sociedad correspondiente para aplicar las reglas de transformación adecuadas.")
 
-pais_seleccionado = st.selectbox(
-    "País de origen de los datos:",
-    options=["El Salvador", "Guatemala", "Honduras"],
-    index=None, # Muestra el selectbox vacío por defecto
-    placeholder="Elige un país de la lista..."
+# Diccionario de mapeo: { "Nombre a mostrar en pantalla" : "País lógico para el código" }
+mapeo_sociedades = {
+    "OPERADORES LOGISTICOS RANSA S.A. DE C.V. (EL SALVADOR)": "El Salvador",
+    "ALMACENES GENERALES DE DEPÓSITOS DE OCCIDENTE S.A. (AGDOSA)": "El Salvador",
+    "OPERADORES LOGISTICOS RANSA S.A. (GUATEMALA)": "Guatemala",
+    "OPERADORES LOGISTICOS RANSA S.A. DE C.V. (HONDURAS)": "Honduras"
+}
+
+sociedad_seleccionada = st.selectbox(
+    "Sociedad de origen de los datos:",
+    options=list(mapeo_sociedades.keys()), # Mostramos solo las llaves (nombres largos)
+    index=None, 
+    placeholder="Elige una sociedad de la lista..."
 )
 
-# --- PASO 2: CARGA DE ARCHIVOS (Visible solo tras seleccionar país) ---
-if pais_seleccionado:
+# --- PASO 2: CARGA DE ARCHIVOS (Visible solo tras seleccionar sociedad) ---
+if sociedad_seleccionada:
+    # "Traducimos" la sociedad al país correspondiente usando el diccionario
+    pais_mapeado = mapeo_sociedades[sociedad_seleccionada]
+    
     st.divider()
-    st.markdown(f"<h3 style='color: {color_verde};'>2. Adjuntar Archivos Base - {pais_seleccionado}</h3>", unsafe_allow_html=True)
-    st.write("Asegúrate de cargar los archivos con los prefijos correctos.")
+    st.markdown(f"<h3 style='color: {color_verde};'>2. Adjuntar Archivos Base</h3>", unsafe_allow_html=True)
+    st.info(f"🏢 Sociedad activa: **{sociedad_seleccionada}** (Lógica aplicada: {pais_mapeado})")
 
     col_up1, col_up2, col_up3 = st.columns(3)
 
@@ -197,32 +336,31 @@ if pais_seleccionado:
     if file_incorporacion and file_maestro and file_requerimientos:
         st.divider()
         st.markdown(f"<h3 style='color: {color_verde};'>3. Resultados y Descarga</h3>", unsafe_allow_html=True)
-        st.success(f"✅ Archivos cargados exitosamente. Motor de transformación listo para {pais_seleccionado}.")
+        st.success("✅ Archivos cargados exitosamente. Procesando información...")
         
-    # Aquí es donde el código se bifurca según el país seleccionado
-        if pais_seleccionado == "El Salvador":
-            # 1. Obtenemos el Excel real procesado para Empleos
+    
+    # Aquí bifurcamos basándonos en el PAÍS MAPEADO, no en el nombre de la sociedad
+        if pais_mapeado == "El Salvador":
             excel_empleos = procesar_el_salvador(file_incorporacion, file_maestro, file_requerimientos)
-            # 2. Expediente sigue usando el archivo temporal "dummy" por ahora
-            excel_expediente = generar_excel_dummy(pais_seleccionado, "Expediente")
+            # NUEVO: Reemplazamos el dummy por la función real
+            excel_expediente = procesar_expediente_el_salvador(file_incorporacion, file_maestro)
             
-        elif pais_seleccionado == "Guatemala":
-            excel_empleos = generar_excel_dummy(pais_seleccionado, "Empleos")
-            excel_expediente = generar_excel_dummy(pais_seleccionado, "Expediente")
+        elif pais_mapeado == "Guatemala":
+            excel_empleos = generar_excel_dummy(pais_mapeado, "Empleos")
+            excel_expediente = generar_excel_dummy(pais_mapeado, "Expediente")
             
-        elif pais_seleccionado == "Honduras":
-            excel_empleos = generar_excel_dummy(pais_seleccionado, "Empleos")
-            excel_expediente = generar_excel_dummy(pais_seleccionado, "Expediente")
+        elif pais_mapeado == "Honduras":
+            excel_empleos = generar_excel_dummy(pais_mapeado, "Empleos")
+            excel_expediente = generar_excel_dummy(pais_mapeado, "Expediente")
         
-        # Renderizado estandarizado de los botones 
-        # (Solo se muestran si el Excel se generó correctamente, evitando errores si algo falla en la lógica)
+        # Renderizado estandarizado de los botones
         if excel_empleos and excel_expediente:
             col_down1, col_down2 = st.columns(2)
             
             with col_down1:
                 st.download_button(
                     label="📥 Descargar Plantilla 'Empleos'",
-                    data=excel_empleos, # Aquí le pasamos la data real
+                    data=excel_empleos,
                     file_name=f"Empleos.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
@@ -237,5 +375,5 @@ if pais_seleccionado:
                     use_container_width=True
                 )
 else:
-    # Mensaje de ayuda mientras no se seleccione un país
-    st.info("👆 Por favor, selecciona un país en el menú superior para habilitar la carga de archivos.")
+    # Mensaje de ayuda mientras no se seleccione una sociedad
+    st.info("👆 Por favor, selecciona una sociedad en el menú superior para habilitar la carga de archivos.")
