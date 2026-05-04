@@ -2,12 +2,14 @@ import streamlit as st
 import pandas as pd
 import io
 
+#col_izq, col_centro, col_der = st.columns([1.5, 1, 1.5,])
+#with col_centro:
 st.image("Logo.png", width=200)
 
 # 1. CONFIGURACIÓN DE LA PÁGINA
 st.set_page_config(
-    page_title="Transformación de Datos HR",
-    page_icon="🔄",
+    page_title="ETL-Evolution",
+    page_icon="Icono.png",
     layout="wide"
 )
 
@@ -15,12 +17,8 @@ color_verde = "#009A3F"
 color_naranja = "#F39200"
 color_gris = "#9D9D9C"
 
-# =========================================================
-# FUNCIONES MODULARES (Preparación para futura lógica)
-# =========================================================
-
 # Estas funciones albergarán la lógica de limpieza y transformación por país.
-# Por ahora usarán el generador dummy, pero la estructura ya está lista.
+# Por ahora usarán el generador dummy, pero la estructura ya está lista.fdef
 def procesar_el_salvador(f_inc, f_mae, f_req):
     try:
         # --- CARGA DE DATOS POR PESTAÑA ---
@@ -34,12 +32,12 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
         for df in [df_org, df_cand, df_mae]:
             df.columns = [str(c).strip() for c in df.columns]
 
-        # 1️⃣ Requerimiento – Datos Organizativos
+        # 1️ Requerimiento – Datos Organizativos
         # Mantenemos solo las columnas solicitadas
         cols_mantener_org = ["RQ", "PLANILLA", "TIPO DE CONTRATO", "MOTIVO", "BONO ANUAL"]
         req_org = df_org[[c for c in cols_mantener_org if c in df_org.columns]].copy()
 
-        # 2️⃣ Requerimiento – Candidatos seleccionados
+        # 2️ Requerimiento – Candidatos seleccionados
         # Mantenemos solo las columnas solicitadas y eliminamos duplicados por RQ
         cols_mantener_cand = ["RQ", "ERF - BÁSICO", "DNI"]
         req_cand = df_cand[[c for c in cols_mantener_cand if c in df_cand.columns]].copy()
@@ -49,10 +47,10 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
         req_org["RQ"] = req_org["RQ"].astype(str).str.strip()
         req_cand["RQ"] = req_cand["RQ"].astype(str).str.strip()
 
-        # 3️⃣ Combinación Base_Requerimiento
+        # 3️ Combinación Base_Requerimiento
         base_req = pd.merge(req_org, req_cand, on="RQ", how="inner")
 
-        # 4️⃣ Preparación del maestro de personal
+        # 4️ Preparación del maestro de personal
         cols_mantener_mae = [
             "COD PERSONAL", "COD. POSICION", "ESTADO", "FECHA DE BAJA", 
             "FECHA FIN DE CONTRATO", "FECHA DE INICIO DE CONTRATO", 
@@ -64,7 +62,7 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
         base_mae["N° DOCUMENTO"] = base_mae["N° DOCUMENTO"].astype(str).str.strip()
         base_req["DNI"] = base_req["DNI"].astype(str).str.strip()
 
-        # 5️⃣ Generación final de la plantilla “Empleos”
+        # 5️ Generación final de la plantilla “Empleos”
         df_final = pd.merge(base_mae, base_req, left_on="N° DOCUMENTO", right_on="DNI", how="inner")
 
         # --- SECCIÓN DE CAMPOS NUEVOS ---
@@ -74,7 +72,7 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
         df_final["Jornada"] = ""
         # --------------------------------
 
-        # 6️⃣ Reordenamiento y Renombre de columnas
+        # 6️ Reordenamiento y Renombre de columnas
         mapeo_nombres = {
             "COD PERSONAL": "Código De Empleado",
             "COD. POSICION": "Codigo Plaza",
@@ -102,7 +100,7 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
         # Reindexamos para asegurar el orden y creación de columnas si alguna faltase
         df_final = df_final.reindex(columns=orden_final)
 
-        # 7️⃣ Limpieza final
+        # 7️ Limpieza final
         df_final = df_final.drop(columns=["N° DOCUMENTO"])
 
         # --- GENERACIÓN DE EXCEL CON AUTOAJUSTE DE COLUMNAS ---
@@ -260,10 +258,538 @@ def procesar_expediente_el_salvador(f_inc, f_mae):
         return None
 
 def procesar_guatemala(f_inc, f_mae, f_req):
-    pass
+    try:
+        # --- CARGA DE DATOS POR PESTAÑA ---
+        df_org = pd.read_excel(f_req, sheet_name="Datos organizativos")
+        df_cand = pd.read_excel(f_req, sheet_name="Candidatos seleccionados")
+        df_mae = pd.read_excel(f_mae)
+
+        # Limpieza de nombres de columnas
+        for df in [df_org, df_cand, df_mae]:
+            df.columns = [str(c).strip() for c in df.columns]
+
+        # 1️⃣ Requerimiento – Datos Organizativos
+        cols_mantener_org = ["RQ", "PLANILLA", "TIPO DE CONTRATO", "MOTIVO", "BONO ANUAL"]
+        req_org = df_org[[c for c in cols_mantener_org if c in df_org.columns]].copy()
+
+        # 2️⃣ Requerimiento – Candidatos seleccionados
+        cols_mantener_cand = ["RQ", "ERF - BÁSICO", "DNI"]
+        req_cand = df_cand[[c for c in cols_mantener_cand if c in df_cand.columns]].copy()
+        req_cand = req_cand.drop_duplicates(subset=["RQ"])
+
+        # Estandarización de tipos para el primer JOIN (RQ)
+        req_org["RQ"] = req_org["RQ"].astype(str).str.strip()
+        req_cand["RQ"] = req_cand["RQ"].astype(str).str.strip()
+
+        # 3️⃣ Combinación Base_Requerimiento
+        base_req = pd.merge(req_org, req_cand, on="RQ", how="inner")
+
+        # 4️⃣ Preparación del maestro de personal
+        cols_mantener_mae = [
+            "COD PERSONAL", "COD. POSICION", "ESTADO", "FECHA DE BAJA", 
+            "FECHA FIN DE CONTRATO", "FECHA DE INICIO DE CONTRATO", 
+            "FECHA DE INGRESO AL GRUPO", "N° DOCUMENTO"
+        ]
+        base_mae = df_mae[[c for c in cols_mantener_mae if c in df_mae.columns]].copy()
+
+        # Estandarización de tipos para el segundo JOIN
+        base_mae["N° DOCUMENTO"] = base_mae["N° DOCUMENTO"].astype(str).str.strip()
+        base_req["DNI"] = base_req["DNI"].astype(str).str.strip()
+
+        # 5️⃣ Generación final de la plantilla “Empleos”
+        df_final = pd.merge(base_mae, base_req, left_on="N° DOCUMENTO", right_on="DNI", how="inner")
+
+        # --- SECCIÓN DE CAMPOS NUEVOS (GUATEMALA) ---
+        # Se agregan vacíos según requerimiento para identificación posterior
+        df_final["Gastos de Representacion"] = ""
+        df_final["Numero Horas por Mes"] = ""
+        
+        # Lógica de autocompletado para Jornada
+        # Como las columnas anteriores se crean en este paso, asignamos el valor predeterminado
+        df_final["Jornada"] = "Jornada Administrativa"
+        # --------------------------------------------
+
+        # 6️⃣ Reordenamiento y Renombre de columnas
+        mapeo_nombres = {
+            "COD PERSONAL": "Código De Empleado",
+            "COD. POSICION": "Codigo Plaza",
+            "ESTADO": "Estado",
+            "PLANILLA": "Tipo de Planilla",
+            "FECHA DE INGRESO AL GRUPO": "Fecha Ingreso",
+            "FECHA DE BAJA": "Fecha de Retiro",
+            "MOTIVO": "Motivo de Retiro",
+            "TIPO DE CONTRATO": "Tipo de Contrato",
+            "ERF - BÁSICO": "Salario Mensual",
+            "FECHA DE INICIO DE CONTRATO": "Fecha Inicio Contrato",
+            "FECHA FIN DE CONTRATO": "Fecha Fin Contrato",
+            "BONO ANUAL": "Bonificacion Decreto"
+        }
+        
+        df_final = df_final.rename(columns=mapeo_nombres)
+
+        orden_final = [
+            "Código De Empleado", "Codigo Plaza", "Estado", "Tipo de Planilla", "Fecha Ingreso",
+            "Fecha de Retiro", "Motivo de Retiro", "Tipo de Contrato", "Jornada", "Salario Mensual",
+            "Fecha Inicio Contrato", "Fecha Fin Contrato", "Bonificacion Decreto", 
+            "Gastos de Representacion", "Numero Horas por Mes", "N° DOCUMENTO"
+        ]
+        
+        df_final = df_final.reindex(columns=orden_final)
+
+        # 7️⃣ Limpieza final
+        df_final = df_final.drop(columns=["N° DOCUMENTO"])
+
+        # Generación de Excel con autoajuste
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_final.to_excel(writer, index=False, sheet_name='Empleos')
+            worksheet = writer.sheets['Empleos']
+            for col in worksheet.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                worksheet.column_dimensions[column].width = (max_length + 2)
+        
+        return output.getvalue()
+
+    except Exception as e:
+        st.error(f"Error en la lógica de Guatemala: {e}")
+        return None
+
+def procesar_expediente_guatemala(f_inc, f_mae):
+    try:
+        # 1️ Carga del Maestro
+        df_mae = pd.read_excel(f_mae)
+        df_mae.columns = [str(c).strip() for c in df_mae.columns]
+
+        # 2️ Carga Inteligente del archivo de Incorporación (Buscador de Pestañas)
+        hojas_inc = pd.read_excel(f_inc, sheet_name=None)
+        df_inc_per = None
+        df_inc_fam = None
+        
+        for nombre_hoja, df in hojas_inc.items():
+            df.columns = [str(c).strip() for c in df.columns]
+            # Identificamos la pestaña "Personas" buscando columnas únicas de Guatemala
+            if "Nro. Documento" in df.columns and "Apellido paterno" in df.columns:
+                df_inc_per = df
+            # Identificamos la pestaña "Beneficiarios"
+            if "Vinculo" in df.columns and "Número de Documento" in df.columns:
+                df_inc_fam = df
+                
+        if df_inc_per is None or df_inc_fam is None:
+            st.error("⚠️ No se encontraron las estructuras esperadas en el Excel de Incorporación de Guatemala.")
+            return None
+
+        # ========================================================
+        # PESTAÑA 1: DATOS GENERALES
+        # ========================================================
+        
+        # Preparar Maestro
+        cols_mae_gen = ["PAIS", "COD PERSONAL", "N° DOCUMENTO", "SEXO"]
+        base_mae_gen = df_mae[[c for c in cols_mae_gen if c in df_mae.columns]].copy()
+        
+        # Preparar Incorporación (Personas)
+        cols_inc_gen = [
+            "Nro. Documento", "Nombres completos", "Apellido paterno", "Apellido materno", 
+            "Estado civil", "Fecha de nacimiento", "Nacionalidad", "País de nacimiento", 
+            "Correo personal", "Número de celular", "Teléfono fijo", "Cuenta con cta bancaria", 
+            "Tipo de banco para cta bancaria", "Numero de cta bancaria", "N° Documento IGSS", 
+            "N° Documento NIT", "Nombre de carrera", "Departamento residencia", "Municipio residencia", "Dirección"
+        ]
+        base_inc_per = df_inc_per[[c for c in cols_inc_gen if c in df_inc_per.columns]].copy()
+        
+        # Estandarización y Join
+        base_mae_gen["N° DOCUMENTO"] = base_mae_gen["N° DOCUMENTO"].astype(str).str.strip()
+        base_inc_per["Nro. Documento"] = base_inc_per["Nro. Documento"].astype(str).str.strip()
+        df_gen = pd.merge(base_mae_gen, base_inc_per, left_on="N° DOCUMENTO", right_on="Nro. Documento", how="inner")
+        
+        # Separación de la columna "Nombres completos"
+        if "Nombres completos" in df_gen.columns:
+            # Dividimos usando el delimitador espacio. n=1 significa que solo cortará en el primer espacio
+            split_names = df_gen["Nombres completos"].astype(str).str.split(" ", n=1, expand=True)
+            df_gen["Primer Nombre"] = split_names[0] if 0 in split_names.columns else ""
+            df_gen["Segundo Nombre"] = split_names[1] if 1 in split_names.columns else ""
+        else:
+            df_gen["Primer Nombre"] = ""
+            df_gen["Segundo Nombre"] = ""
+            
+        # Renombrado de Columnas
+        map_gen = {
+            "PAIS": "Pais Empresa", "COD PERSONAL": "Código De Empleado", "SEXO": "Genero",
+            "Apellido paterno": "Primer Apellido", "Apellido materno": "Segundo Apellido",
+            "Estado civil": "EstadoCivil", "País de nacimiento": "Pais Nacimiento",
+            "Fecha de nacimiento": "Fecha Nacimiento", "Nacionalidad": "Pais Nacionalidad",
+            "Numero de cta bancaria": "Cuenta Banco", "Tipo de banco para cta bancaria": "Tipo Cuenta Banco",
+            "Cuenta con cta bancaria": "Banco", "Departamento residencia": "Departamento Residencia",
+            "Municipio residencia": "Municipio Residencia", "Teléfono fijo": "Telefono",
+            "Número de celular": "Celular", "Correo personal": "eMail Interno",
+            "Nombre de carrera": "Profesión (100 caracteres)", "N° Documento IGSS": "No Identificacion",
+            "N° Documento NIT": "No Identificacion Tributaria"
+        }
+        df_gen = df_gen.rename(columns=map_gen)
+        
+        # Agregar columnas nuevas
+        df_gen["Otros Nombres"] = ""
+        df_gen["Apellido Casada"] = ""
+        df_gen["No Seguro Social"] = ""
+        df_gen["AFP"] = ""
+        df_gen["NUP"] = ""
+        df_gen["Digito Verificador"] = ""
+        
+        # Orden y limpieza final
+        orden_gen = [
+            "Pais Empresa", "Código De Empleado", "Primer Nombre", "Segundo Nombre", "Otros Nombres", 
+            "Primer Apellido", "Segundo Apellido", "Apellido Casada", "Genero", "EstadoCivil", 
+            "Pais Nacimiento", "Fecha Nacimiento", "Pais Nacionalidad", "Cuenta Banco", "Tipo Cuenta Banco", 
+            "Banco", "Dirección", "Departamento Residencia", "Municipio Residencia", "Telefono", 
+            "Celular", "eMail Interno", "Profesión (100 caracteres)", "No Identificacion", "No Seguro Social", 
+            "No Identificacion Tributaria", "AFP", "NUP", "Digito Verificador"
+        ]
+        df_gen = df_gen.reindex(columns=orden_gen)
+        
+        if "N° DOCUMENTO" in df_gen.columns:
+            df_gen = df_gen.drop(columns=["N° DOCUMENTO"])
+
+        # ========================================================
+        # PESTAÑA 2: DEPENDIENTES
+        # ========================================================
+        
+        cols_mae_dep = ["COD PERSONAL", "N° DOCUMENTO"]
+        base_mae_dep = df_mae[[c for c in cols_mae_dep if c in df_mae.columns]].copy()
+        
+        cols_inc_fam = [
+            "Número de Documento", "Vinculo", "N° de doc. de derechohabiente", 
+            "Fecha de nacimiento", "Nombres completos", "Sexo", "Nivel educativo", 
+            "Cargo y área en la que trabaja"
+        ]
+        base_inc_fam = df_inc_fam[[c for c in cols_inc_fam if c in df_inc_fam.columns]].copy()
+        
+        # Estandarización y Join
+        base_mae_dep["N° DOCUMENTO"] = base_mae_dep["N° DOCUMENTO"].astype(str).str.strip()
+        base_inc_fam["Número de Documento"] = base_inc_fam["Número de Documento"].astype(str).str.strip()
+        df_dep = pd.merge(base_mae_dep, base_inc_fam, left_on="N° DOCUMENTO", right_on="Número de Documento", how="inner")
+        
+        # Renombrado de Columnas
+        map_dep = {
+            "COD PERSONAL": "CodigoEmpleado", "Vinculo": "Parentesco", "Nombres completos": "nombre", 
+            "Sexo": "Género", "Fecha de nacimiento": "FechaNacimiento", 
+            "N° de doc. de derechohabiente": "No Documento", "Cargo y área en la que trabaja": "LugarTrabajo", 
+            "Nivel educativo": "NivelEstudio"
+        }
+        df_dep = df_dep.rename(columns=map_dep)
+        
+        # Agregar columnas vacías
+        df_dep["EstadoCivil"] = ""
+        df_dep["DependenciaEconomica"] = ""
+        df_dep["Trabaja"] = ""
+        df_dep["Estudia"] = ""
+        df_dep["LugarEstudio"] = ""
+            
+        # Orden final
+        orden_dep = [
+            "CodigoEmpleado", "Parentesco", "nombre", "Género", "EstadoCivil", 
+            "DependenciaEconomica", "FechaNacimiento", "No Documento", "Trabaja", 
+            "LugarTrabajo", "Estudia", "NivelEstudio", "LugarEstudio"
+        ]
+        df_dep = df_dep.reindex(columns=orden_dep)
+
+        # ========================================================
+        # GENERACIÓN DEL EXCEL MULTI-HOJA
+        # ========================================================
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_gen.to_excel(writer, index=False, sheet_name='Datos Generales')
+            df_dep.to_excel(writer, index=False, sheet_name='Dependientes')
+            
+            # Autoajuste de celdas
+            for sheet_name in ['Datos Generales', 'Dependientes']:
+                worksheet = writer.sheets[sheet_name]
+                for col in worksheet.columns:
+                    max_length = 0
+                    column = col[0].column_letter
+                    for cell in col:
+                        try:
+                            if len(str(cell.value)) > max_length: max_length = len(str(cell.value))
+                        except: pass
+                    worksheet.column_dimensions[column].width = (max_length + 2)
+                    
+        return output.getvalue()
+
+    except Exception as e:
+        st.error(f"Error crítico en la plantilla de Expediente (Guatemala): {e}")
+        return None
 
 def procesar_honduras(f_inc, f_mae, f_req):
-    pass
+    try:
+        # --- CARGA DE DATOS POR PESTAÑA ---
+        df_org = pd.read_excel(f_req, sheet_name="Datos organizativos")
+        df_cand = pd.read_excel(f_req, sheet_name="Candidatos seleccionados")
+        df_mae = pd.read_excel(f_mae)
+
+        # Limpieza inicial de nombres de columnas (quitar espacios invisibles)
+        for df in [df_org, df_cand, df_mae]:
+            df.columns = [str(c).strip() for c in df.columns]
+
+        # 1️ Requerimiento – Datos Organizativos
+        # Nota: Aquí usamos "TIPO DE CONV" específico de Honduras
+        cols_mantener_org = ["RQ", "MOTIVO", "PLANILLA", "TIPO DE CONV", "BONO ANUAL"]
+        req_org = df_org[[c for c in cols_mantener_org if c in df_org.columns]].copy()
+
+        # 2️ Requerimiento – Candidatos seleccionados
+        cols_mantener_cand = ["RQ", "DNI", "ERF - BÁSICO"]
+        req_cand = df_cand[[c for c in cols_mantener_cand if c in df_cand.columns]].copy()
+        
+        # Eliminación de duplicados por RQ
+        if "RQ" in req_cand.columns:
+            req_cand = req_cand.drop_duplicates(subset=["RQ"])
+
+        # Estandarización de tipos de dato para el primer JOIN
+        if "RQ" in req_org.columns: req_org["RQ"] = req_org["RQ"].astype(str).str.strip()
+        if "RQ" in req_cand.columns: req_cand["RQ"] = req_cand["RQ"].astype(str).str.strip()
+
+        # 3️ Combinación Base_Requerimiento
+        base_req = pd.merge(req_org, req_cand, on="RQ", how="inner")
+
+        # 4️ Preparación del maestro de personal
+        cols_mantener_mae = [
+            "COD PERSONAL", "COD. POSICION", "ESTADO", "FECHA DE BAJA", 
+            "FECHA FIN DE CONTRATO", "FECHA DE INICIO DE CONTRATO", 
+            "FECHA DE INGRESO AL GRUPO", "N° DOCUMENTO"
+        ]
+        base_mae = df_mae[[c for c in cols_mantener_mae if c in df_mae.columns]].copy()
+
+        # Estandarización de tipos de dato para el segundo JOIN
+        if "N° DOCUMENTO" in base_mae.columns: base_mae["N° DOCUMENTO"] = base_mae["N° DOCUMENTO"].astype(str).str.strip()
+        if "DNI" in base_req.columns: base_req["DNI"] = base_req["DNI"].astype(str).str.strip()
+
+        # 5️ Generación final de la plantilla “Empleos”
+        df_final = pd.merge(base_mae, base_req, left_on="N° DOCUMENTO", right_on="DNI", how="inner")
+
+        # Renombrado de columnas (incluyendo TIPO DE CONV)
+        mapeo_nombres = {
+            "COD PERSONAL": "Código De Empleado",
+            "COD. POSICION": "Codigo Plaza",
+            "ESTADO": "Estado",
+            "PLANILLA": "Tipo de Planilla",
+            "FECHA DE INGRESO AL GRUPO": "Fecha Ingreso",
+            "FECHA DE BAJA": "Fecha de Retiro",
+            "MOTIVO": "Motivo de Retiro",
+            "TIPO DE CONV": "Tipo de Contrato",
+            "ERF - BÁSICO": "Salario Mensual",
+            "FECHA DE INICIO DE CONTRATO": "Fecha Inicio Contrato",
+            "FECHA FIN DE CONTRATO": "Fecha Fin Contrato",
+            "BONO ANUAL": "Bonificacion Decreto"
+        }
+        df_final = df_final.rename(columns=mapeo_nombres)
+
+        # Agregar campos vacíos
+        df_final["Gastos de Representacion"] = ""
+        df_final["Numero Horas por Mes"] = ""
+        
+        # Autocompletado de Jornada
+        df_final["Jornada"] = "Jornada Administrativa"
+
+        # 6️ Reordenamiento de columnas
+        orden_final = [
+            "Código De Empleado", "Codigo Plaza", "Estado", "Tipo de Planilla", "Fecha Ingreso",
+            "Fecha de Retiro", "Motivo de Retiro", "Tipo de Contrato", "Jornada", "Salario Mensual",
+            "Fecha Inicio Contrato", "Fecha Fin Contrato", "Bonificacion Decreto", 
+            "Gastos de Representacion", "Numero Horas por Mes", "N° DOCUMENTO"
+        ]
+        
+        df_final = df_final.reindex(columns=orden_final)
+
+        # 7️ Limpieza final
+        if "N° DOCUMENTO" in df_final.columns:
+            df_final = df_final.drop(columns=["N° DOCUMENTO"])
+
+        # Generación de Excel con autoajuste de celdas
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_final.to_excel(writer, index=False, sheet_name='Empleos')
+            worksheet = writer.sheets['Empleos']
+            for col in worksheet.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                worksheet.column_dimensions[column].width = (max_length + 2)
+        
+        return output.getvalue()
+
+    except Exception as e:
+        st.error(f"Error en la lógica de Honduras (Empleos): {e}")
+        return None
+
+def procesar_expediente_honduras(f_inc, f_mae):
+    try:
+        # 1️ Carga del Maestro
+        df_mae = pd.read_excel(f_mae)
+        df_mae.columns = [str(c).strip() for c in df_mae.columns]
+
+        # 2️ Carga Inteligente del archivo de Incorporación (Buscador de Pestañas)
+        hojas_inc = pd.read_excel(f_inc, sheet_name=None)
+        df_inc_per = None
+        df_inc_fam = None
+        
+        for nombre_hoja, df in hojas_inc.items():
+            df.columns = [str(c).strip() for c in df.columns]
+            # Identificamos la pestaña "Personas" buscando columnas clave de Honduras
+            if "Nro. Documento" in df.columns and "Tienes cta. en bancaria en BAC" in df.columns:
+                df_inc_per = df
+            # Identificamos la pestaña "Beneficiarios"
+            if "N° de doc. de beneficiario" in df.columns and "Número de Documento" in df.columns:
+                df_inc_fam = df
+                
+        if df_inc_per is None or df_inc_fam is None:
+            st.error("⚠️ No se encontraron las estructuras esperadas en el Excel de Incorporación de Honduras.")
+            return None
+
+        # ========================================================
+        # PESTAÑA 1: DATOS GENERALES
+        # ========================================================
+        
+        # Preparar Maestro
+        cols_mae_gen = ["PAIS", "COD PERSONAL", "N° DOCUMENTO", "SEXO"]
+        base_mae_gen = df_mae[[c for c in cols_mae_gen if c in df_mae.columns]].copy()
+        
+        # Preparar Incorporación (Personas)
+        cols_inc_gen = [
+            "Nro. Documento", "Nombres completos", "Apellido paterno", "Apellido materno", 
+            "Estado civil", "Fecha de nacimiento", "Nacionalidad", "País de nacimiento", 
+            "Correo personal", "Número de celular", "Teléfono fijo", "Tienes cta. en bancaria en BAC", 
+            "Numero de cta. bancaria", "Tipo de banco para apertura cta. bancaria", 
+            "Nombre de carrera", "Departamento residencia", "Municipio residencia", "Dirección exacta"
+        ]
+        base_inc_per = df_inc_per[[c for c in cols_inc_gen if c in df_inc_per.columns]].copy()
+        
+        # Estandarización y Join
+        base_mae_gen["N° DOCUMENTO"] = base_mae_gen["N° DOCUMENTO"].astype(str).str.strip()
+        base_inc_per["Nro. Documento"] = base_inc_per["Nro. Documento"].astype(str).str.strip()
+        df_gen = pd.merge(base_mae_gen, base_inc_per, left_on="N° DOCUMENTO", right_on="Nro. Documento", how="inner")
+        
+        # Separación de la columna "Nombres completos" (SplitTextByDelimiter)
+        if "Nombres completos" in df_gen.columns:
+            # Separamos por el primer espacio encontrado
+            split_names = df_gen["Nombres completos"].astype(str).str.split(" ", n=1, expand=True)
+            df_gen["Primer Nombre"] = split_names[0] if 0 in split_names.columns else ""
+            df_gen["Segundo Nombre"] = split_names[1] if 1 in split_names.columns else ""
+        else:
+            df_gen["Primer Nombre"] = ""
+            df_gen["Segundo Nombre"] = ""
+            
+        # Renombrado de Columnas
+        map_gen = {
+            "PAIS": "Pais Empresa", "COD PERSONAL": "Código De Empleado", "SEXO": "Genero",
+            "Apellido paterno": "Primer Apellido", "Apellido materno": "Segundo Apellido",
+            "Estado civil": "EstadoCivil", "País de nacimiento": "Pais Nacimiento",
+            "Fecha de nacimiento": "Fecha Nacimiento", "Nacionalidad": "Pais Nacionalidad",
+            "Tipo de banco para apertura cta. bancaria": "Tipo Cuenta Banco",
+            "Dirección exacta": "Dirección", "Departamento residencia": "Departamento Residencia",
+            "Municipio residencia": "Municipio Residencia", "Teléfono fijo": "Telefono",
+            "Número de celular": "Celular", "Correo personal": "eMail Interno",
+            "Nombre de carrera": "Profesión (100 caracteres)", "Nro. Documento": "No Identificacion",
+            "Numero de cta. bancaria": "Cuenta Banco", "Tienes cta. en bancaria en BAC": "Banco"
+        }
+        df_gen = df_gen.rename(columns=map_gen)
+        
+        # Agregar columnas nuevas/vacías
+        df_gen["Otros Nombres"] = ""
+        df_gen["Apellido Casada"] = ""
+        df_gen["No Seguro Social"] = ""
+        df_gen["No Identificacion Tributaria"] = ""
+        df_gen["AFP"] = ""
+        df_gen["NUP"] = ""
+        df_gen["Digito Verificador"] = ""
+        
+        # Orden y limpieza final (Asegurando las 29 columnas obligatorias)
+        orden_gen = [
+            "Pais Empresa", "Código De Empleado", "Primer Nombre", "Segundo Nombre", "Otros Nombres", 
+            "Primer Apellido", "Segundo Apellido", "Apellido Casada", "Genero", "EstadoCivil", 
+            "Pais Nacimiento", "Fecha Nacimiento", "Pais Nacionalidad", "Cuenta Banco", "Tipo Cuenta Banco", 
+            "Banco", "Dirección", "Departamento Residencia", "Municipio Residencia", "Telefono", 
+            "Celular", "eMail Interno", "Profesión (100 caracteres)", "No Identificacion", "No Seguro Social", 
+            "No Identificacion Tributaria", "AFP", "NUP", "Digito Verificador"
+        ]
+        df_gen = df_gen.reindex(columns=orden_gen)
+        
+        if "N° DOCUMENTO" in df_gen.columns:
+            df_gen = df_gen.drop(columns=["N° DOCUMENTO"])
+
+        # ========================================================
+        # PESTAÑA 2: DEPENDIENTES
+        # ========================================================
+        
+        # Preparar Maestro
+        cols_mae_dep = ["COD PERSONAL", "N° DOCUMENTO"]
+        base_mae_dep = df_mae[[c for c in cols_mae_dep if c in df_mae.columns]].copy()
+        
+        # Preparar Incorporación (Beneficiarios) - Agregando 'Número de Documento' para el join
+        cols_inc_fam = [
+            "Número de Documento", "N° de doc. de beneficiario", "Fecha de nacimiento", 
+            "Nombres completos", "Sexo", "Nivel educativo"
+        ]
+        base_inc_fam = df_inc_fam[[c for c in cols_inc_fam if c in df_inc_fam.columns]].copy()
+        
+        # Estandarización y Join
+        base_mae_dep["N° DOCUMENTO"] = base_mae_dep["N° DOCUMENTO"].astype(str).str.strip()
+        base_inc_fam["Número de Documento"] = base_inc_fam["Número de Documento"].astype(str).str.strip()
+        df_dep = pd.merge(base_mae_dep, base_inc_fam, left_on="N° DOCUMENTO", right_on="Número de Documento", how="inner")
+        
+        # Renombrado de Columnas
+        map_dep = {
+            "COD PERSONAL": "CodigoEmpleado", "Nombres completos": "nombre", 
+            "Sexo": "Género", "Fecha de nacimiento": "FechaNacimiento", 
+            "N° de doc. de beneficiario": "No Documento", "Nivel educativo": "NivelEstudio"
+        }
+        df_dep = df_dep.rename(columns=map_dep)
+        
+        # Agregar columnas vacías
+        for col in ["Parentesco", "EstadoCivil", "DependenciaEconomica", "Trabaja", "LugarTrabajo", "Estudia", "LugarEstudio"]:
+            df_dep[col] = ""
+            
+        # Orden final (Asegurando las 13 columnas obligatorias)
+        orden_dep = [
+            "CodigoEmpleado", "Parentesco", "nombre", "Género", "EstadoCivil", 
+            "DependenciaEconomica", "FechaNacimiento", "No Documento", "Trabaja", 
+            "LugarTrabajo", "Estudia", "NivelEstudio", "LugarEstudio"
+        ]
+        df_dep = df_dep.reindex(columns=orden_dep)
+
+        # ========================================================
+        # GENERACIÓN DEL EXCEL MULTI-HOJA
+        # ========================================================
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_gen.to_excel(writer, index=False, sheet_name='Datos Generales')
+            df_dep.to_excel(writer, index=False, sheet_name='Dependientes')
+            
+            # Autoajuste de celdas
+            for sheet_name in ['Datos Generales', 'Dependientes']:
+                worksheet = writer.sheets[sheet_name]
+                for col in worksheet.columns:
+                    max_length = 0
+                    column = col[0].column_letter
+                    for cell in col:
+                        try:
+                            if len(str(cell.value)) > max_length: max_length = len(str(cell.value))
+                        except: pass
+                    worksheet.column_dimensions[column].width = (max_length + 2)
+                    
+        return output.getvalue()
+
+    except Exception as e:
+        st.error(f"Error crítico en la plantilla de Expediente (Honduras): {e}")
+        return None
 
 # Generador temporal de Excel para pruebas de botones
 def generar_excel_dummy(pais_origen, tipo_plantilla):
@@ -284,7 +810,7 @@ def generar_excel_dummy(pais_origen, tipo_plantilla):
 # =========================================================
 
 st.markdown(f"<h1 style='text-align: center; color: {color_naranja};'>Automatización de Plantillas de Personal</h1>", unsafe_allow_html=True)
-st.markdown(f"<h4 style='text-align: center; color: {color_gris};'>Generador estandarizado de Empleos y Expediente</h4>", unsafe_allow_html=True)
+#st.markdown(f"<h4 style='text-align: center; color: {color_gris};'>Generador estandarizado de Empleos y Expediente</h4>", unsafe_allow_html=True)
 st.divider()
 
 # --- PASO 1: SELECCIÓN DE SOCIEDAD ---
@@ -342,16 +868,15 @@ if sociedad_seleccionada:
     # Aquí bifurcamos basándonos en el PAÍS MAPEADO, no en el nombre de la sociedad
         if pais_mapeado == "El Salvador":
             excel_empleos = procesar_el_salvador(file_incorporacion, file_maestro, file_requerimientos)
-            # NUEVO: Reemplazamos el dummy por la función real
             excel_expediente = procesar_expediente_el_salvador(file_incorporacion, file_maestro)
             
         elif pais_mapeado == "Guatemala":
-            excel_empleos = generar_excel_dummy(pais_mapeado, "Empleos")
-            excel_expediente = generar_excel_dummy(pais_mapeado, "Expediente")
+            excel_empleos = procesar_guatemala(file_incorporacion, file_maestro, file_requerimientos)
+            excel_expediente = procesar_expediente_guatemala(file_incorporacion, file_maestro)
             
         elif pais_mapeado == "Honduras":
-            excel_empleos = generar_excel_dummy(pais_mapeado, "Empleos")
-            excel_expediente = generar_excel_dummy(pais_mapeado, "Expediente")
+            excel_empleos = procesar_honduras(file_incorporacion, file_maestro, file_requerimientos)
+            excel_expediente = procesar_expediente_honduras(file_incorporacion, file_maestro)
         
         # Renderizado estandarizado de los botones
         if excel_empleos and excel_expediente:
