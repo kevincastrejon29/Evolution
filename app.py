@@ -13,6 +13,30 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- BARRA LATERAL (SIDEBAR): CENTRO DE AYUDA ---
+with st.sidebar:
+    st.markdown("<h2 style='color: #009A3F;'>💡 Centro de Ayuda</h2>", unsafe_allow_html=True)
+    st.write("Bienvenido al asistente de automatización HR. Haz clic en las preguntas para resolver tus dudas:")
+    
+    with st.expander("🤔 ¿Para qué sirve esta plataforma?"):
+        st.write("Esta herramienta automatiza el cruce de datos entre el Maestro de Personal y las hojas de Requerimientos e Incorporación, generando las plantillas 'Empleos' y 'Expediente' en segundos y sin errores manuales.")
+        
+    with st.expander("🛠️ ¿Cómo debo utilizarla?"):
+        st.markdown("""
+        1. Selecciona tu **Sociedad** en el panel principal.
+        2. Arrastra los **3 archivos Excel** originales.
+        3. Haz clic en **Descargar** para obtener tus plantillas formateadas.
+        """)
+        
+    with st.expander("⚠️ ¿Qué hago si me sale un error?"):
+        st.write("Asegúrate de que los archivos estén en formato Excel (.xlsx o .xls) y que no se hayan modificado los nombres de las pestañas originales ('Datos organizativos', 'Candidatos seleccionados', etc.).")
+
+    with st.expander("🔒 ¿Qué pasa con los datos que subo?"):
+        st.write("Toda la información se procesa de forma temporal en la memoria. No se guarda ningún archivo ni dato sensible en servidores externos. Una vez que descargas tu Excel o cierras la página, los datos desaparecen.")
+
+    st.divider()
+    st.caption("Desarrollado para la mejora de procesos. v1.0")
+
 color_verde = "#009A3F"
 color_naranja = "#F39200"
 color_gris = "#9D9D9C"
@@ -34,7 +58,7 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
 
         # 1️ Requerimiento – Datos Organizativos
         # Mantenemos solo las columnas solicitadas
-        cols_mantener_org = ["RQ", "PLANILLA", "TIPO DE CONTRATO", "MOTIVO", "BONO ANUAL"]
+        cols_mantener_org = ["RQ", "CLASE DE CONTRATO", "MOTIVO", "BONO ANUAL"]
         req_org = df_org[[c for c in cols_mantener_org if c in df_org.columns]].copy()
 
         # 2️ Requerimiento – Candidatos seleccionados
@@ -52,9 +76,9 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
 
         # 4️ Preparación del maestro de personal
         cols_mantener_mae = [
-            "COD PERSONAL", "COD. POSICION", "ESTADO", "FECHA DE BAJA", 
-            "FECHA FIN DE CONTRATO", "FECHA DE INICIO DE CONTRATO", 
-            "FECHA DE INGRESO AL GRUPO", "N° DOCUMENTO"
+            "COD PERSONAL", "COD POSICION", "ESTADO", "FECHA DE BAJA", 
+            "FECHA FIN CONTRATO", "FECHA INICIO CONTRATO", 
+            "FECHA INGRESO AL GRUPO", "N° DOCUMENTO", "CLASE CONTRATO"
         ]
         base_mae = df_mae[[c for c in cols_mantener_mae if c in df_mae.columns]].copy()
 
@@ -75,16 +99,16 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
         # 6️ Reordenamiento y Renombre de columnas
         mapeo_nombres = {
             "COD PERSONAL": "Código De Empleado",
-            "COD. POSICION": "Codigo Plaza",
+            "COD POSICION": "Codigo Plaza",
             "ESTADO": "Estado",
-            "PLANILLA": "Tipo de Planilla",
-            "FECHA DE INGRESO AL GRUPO": "Fecha Ingreso",
+            "CLASE DE CONTRATO": "Tipo de Planilla",
+            "FECHA INGRESO AL GRUPO": "Fecha Ingreso",
             "FECHA DE BAJA": "Fecha de Retiro",
             "MOTIVO": "Motivo de Retiro",
-            "TIPO DE CONTRATO": "Tipo de Contrato",
+            "CLASE CONTRATO": "Tipo de Contrato",
             "ERF - BÁSICO": "Salario Mensual",
-            "FECHA DE INICIO DE CONTRATO": "Fecha Inicio Contrato",
-            "FECHA FIN DE CONTRATO": "Fecha Fin Contrato",
+            "FECHA INICIO CONTRATO": "Fecha Inicio Contrato",
+            "FECHA FIN CONTRATO": "Fecha Fin Contrato",
             "BONO ANUAL": "Bonificacion Decreto"
         }
         
@@ -97,6 +121,14 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
             "Gastos de Representacion", "Numero Horas por Mes", "N° DOCUMENTO"
         ]
         
+        #--------------
+        #--- AJUSTES FINALES: ESTADO ---
+        if "Estado" in df_final.columns:
+            # Reemplazamos los valores exactos
+            map_estado = {"ACTIVO": "Activo", "CESADO": "Retirado"}
+            df_final["Estado"] = df_final["Estado"].replace(map_estado)
+        #--------------
+
         # Reindexamos para asegurar el orden y creación de columnas si alguna faltase
         df_final = df_final.reindex(columns=orden_final)
 
@@ -104,6 +136,10 @@ def procesar_el_salvador(f_inc, f_mae, f_req):
         df_final = df_final.drop(columns=["N° DOCUMENTO"])
 
         # --- GENERACIÓN DE EXCEL CON AUTOAJUSTE DE COLUMNAS ---
+        
+        # Limpieza Global: Reemplazar guiones "-" por vacío
+        df_final = df_final.replace("-", "", regex=False)
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, index=False, sheet_name='Empleos')
@@ -173,7 +209,9 @@ def procesar_expediente_el_salvador(f_inc, f_mae):
         
         # Renombrado de Columnas
         map_gen = {
-            "PAIS": "Pais Empresa", "COD PERSONAL": "Código De Empleado", "Primer nombre": "Primer Nombre",
+            "PAIS": "Pais Empresa", 
+            "COD PERSONAL": "Código De Empleado", 
+            "Primer nombre": "Primer Nombre",
             "Segundo nombre": "Segundo Nombre", "Primer apellido": "Primer Apellido", "Segundo apellido": "Segundo Apellido",
             "Apellido de casada": "Apellido Casada", "SEXO": "Genero", "Estado civil": "EstadoCivil",
             "Nacionalidad": "Pais Nacionalidad", "Número de cta bancaria": "Cuenta Banco", "Dirección completa": "Dirección",
@@ -183,6 +221,9 @@ def procesar_expediente_el_salvador(f_inc, f_mae):
             "País de nacimiento": "Pais Nacimiento", "Número de ISSS": "No Seguro Social"
         }
         df_gen = df_gen.rename(columns=map_gen)
+        # Formateo de Fecha de Nacimiento (DD/MM/YYYY) para Datos Generales
+        if "Fecha Nacimiento" in df_gen.columns:
+            df_gen["Fecha Nacimiento"] = pd.to_datetime(df_gen["Fecha Nacimiento"], errors='coerce').dt.strftime('%d/%m/%Y').fillna("")
         
         # Agregar columnas nuevas
         df_gen["Otros Nombres"] = ""
@@ -190,6 +231,46 @@ def procesar_expediente_el_salvador(f_inc, f_mae):
         df_gen["No Identificacion Tributaria"] = ""
         df_gen["Digito Verificador"] = ""
         
+        #-----------------
+        # --- MAPEOS GLOBALES: DATOS GENERALES ---
+        
+        # 1. Mapeo de Género
+        if "Genero" in df_gen.columns:
+            map_genero = {"MASCULINO": "M", "FEMENINO": "F"}
+            df_gen["Genero"] = df_gen["Genero"].str.upper().map(map_genero).fillna(df_gen["Genero"])
+
+        # 2. Mapeo de Países (Nacimiento y Nacionalidad) - CORREGIDO
+        map_paises = {
+            "el salvador": "sv", 
+            "guatemala": "gt", 
+            "nicaragua": "ni",
+            "honduras": "hn", 
+            "panama": "pa", 
+            "costa rica": "cr", 
+            "estados unidos": "us"
+        }
+        for col in ["Pais Nacimiento", "Pais Nacionalidad"]:
+            if col in df_gen.columns:
+                # Convertimos lo que viene del Excel a minúsculas y sin espacios para que haga "match" perfecto
+                df_gen[col] = df_gen[col].astype(str).str.lower().str.strip().map(map_paises).fillna(df_gen[col])
+
+        # 3. Mapeo de Tipo de Cuenta
+        if "Tipo Cuenta Banco" in df_gen.columns:
+            map_cuentas = {"Ahorro": "A", "Cuenta Corriente": "C"}
+            df_gen["Tipo Cuenta Banco"] = df_gen["Tipo Cuenta Banco"].map(map_cuentas).fillna(df_gen["Tipo Cuenta Banco"])
+        
+        # 4. Mapeo de Estado Civil (Datos Generales)
+        if "EstadoCivil" in df_gen.columns:
+            map_estado_civil = {
+                "SOLTERO(A)": "S",
+                "CASADO(A)": "C",
+                "UNION LIBRE": "A",
+                "DIVORCIADO(A)": "D",
+                "VIUDO(A)": "V"
+            }
+            # Convertimos a mayúsculas y quitamos espacios para asegurar el match
+            df_gen["EstadoCivil"] = df_gen["EstadoCivil"].str.upper().str.strip().map(map_estado_civil).fillna(df_gen["EstadoCivil"])
+        #-----------------
         # Orden y limpieza final
         orden_gen = ["Pais Empresa", "Código De Empleado", "Primer Nombre", "Segundo Nombre", "Otros Nombres", "Primer Apellido", "Segundo Apellido", "Apellido Casada", "Genero", "EstadoCivil", "Pais Nacimiento", "Fecha Nacimiento", "Pais Nacionalidad", "Cuenta Banco", "Tipo Cuenta Banco", "Banco", "Dirección", "Departamento Residencia", "Municipio Residencia", "Telefono", "Celular", "eMail Interno", "Profesión (100 caracteres)", "No Identificacion", "No Seguro Social", "No Identificacion Tributaria", "AFP", "NUP", "Digito Verificador"]
         df_gen = df_gen.reindex(columns=orden_gen)
@@ -220,8 +301,32 @@ def procesar_expediente_el_salvador(f_inc, f_mae):
             "N° de doc. de derechohabiente": "No Documento", "Fecha de nacimiento": "FechaNacimiento", "Nivel educativo": "NivelEstudio"
         }
         if col_dependencia: map_dep[col_dependencia] = "DependenciaEconomica"
-            
+
         df_dep = df_dep.rename(columns=map_dep)
+
+        #---------------
+        # --- MAPEOS GLOBALES: DEPENDIENTES ---
+        
+        # 1. Mapeo de Género (ya lo tenías)
+        if "Género" in df_dep.columns:
+            map_genero_dep = {"MASCULINO": "M", "FEMENINO": "F"}
+            df_dep["Género"] = df_dep["Género"].str.upper().map(map_genero_dep).fillna(df_dep["Género"])
+
+        # 2. Mapeo de Estado Civil (Nuevo)
+        if "EstadoCivil" in df_dep.columns:
+            map_civil_dep = {
+                "SOLTERO(A)": "S",
+                "CASADO(A)": "C",
+                "UNION LIBRE": "A",
+                "DIVORCIADO(A)": "D",
+                "VIUDO(A)": "V"
+            }
+            df_dep["EstadoCivil"] = df_dep["EstadoCivil"].str.upper().str.strip().map(map_civil_dep).fillna(df_dep["EstadoCivil"])
+        # -------------- 
+
+        # Formateo de Fecha de Nacimiento (DD/MM/YYYY) para Dependientes
+        if "FechaNacimiento" in df_dep.columns:
+            df_dep["FechaNacimiento"] = pd.to_datetime(df_dep["FechaNacimiento"], errors='coerce').dt.strftime('%d/%m/%Y').fillna("")
         
         # Agregar columnas nuevas
         for col in ["EstadoCivil", "Trabaja", "LugarTrabajo", "Estudia", "LugarEstudio"]:
@@ -234,6 +339,11 @@ def procesar_expediente_el_salvador(f_inc, f_mae):
         # ========================================================
         # 📥 GENERACIÓN DEL EXCEL MULTI-HOJA
         # ========================================================
+        
+        # Limpieza Global: Reemplazar guiones "-" por vacío
+        df_gen = df_gen.replace("-", "", regex=False)
+        df_dep = df_dep.replace("-", "", regex=False)
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_gen.to_excel(writer, index=False, sheet_name='Datos Generales')
@@ -269,7 +379,7 @@ def procesar_guatemala(f_inc, f_mae, f_req):
             df.columns = [str(c).strip() for c in df.columns]
 
         # 1️⃣ Requerimiento – Datos Organizativos
-        cols_mantener_org = ["RQ", "PLANILLA", "TIPO DE CONTRATO", "MOTIVO", "BONO ANUAL"]
+        cols_mantener_org = ["RQ", "CLASE DE CONTRATO", "MOTIVO", "BONO ANUAL"]
         req_org = df_org[[c for c in cols_mantener_org if c in df_org.columns]].copy()
 
         # 2️⃣ Requerimiento – Candidatos seleccionados
@@ -286,9 +396,9 @@ def procesar_guatemala(f_inc, f_mae, f_req):
 
         # 4️⃣ Preparación del maestro de personal
         cols_mantener_mae = [
-            "COD PERSONAL", "COD. POSICION", "ESTADO", "FECHA DE BAJA", 
-            "FECHA FIN DE CONTRATO", "FECHA DE INICIO DE CONTRATO", 
-            "FECHA DE INGRESO AL GRUPO", "N° DOCUMENTO"
+            "COD PERSONAL", "COD POSICION", "ESTADO", "FECHA DE BAJA", 
+            "FECHA FIN CONTRATO", "FECHA INICIO CONTRATO", 
+            "FECHA INGRESO AL GRUPO", "N° DOCUMENTO", "CLASE CONTRATO"
         ]
         base_mae = df_mae[[c for c in cols_mantener_mae if c in df_mae.columns]].copy()
 
@@ -312,16 +422,16 @@ def procesar_guatemala(f_inc, f_mae, f_req):
         # 6️⃣ Reordenamiento y Renombre de columnas
         mapeo_nombres = {
             "COD PERSONAL": "Código De Empleado",
-            "COD. POSICION": "Codigo Plaza",
+            "COD POSICION": "Codigo Plaza",
             "ESTADO": "Estado",
-            "PLANILLA": "Tipo de Planilla",
-            "FECHA DE INGRESO AL GRUPO": "Fecha Ingreso",
+            "CLASE DE CONTRATO": "Tipo de Planilla",
+            "FECHA INGRESO AL GRUPO": "Fecha Ingreso",
             "FECHA DE BAJA": "Fecha de Retiro",
             "MOTIVO": "Motivo de Retiro",
-            "TIPO DE CONTRATO": "Tipo de Contrato",
+            "CLASE CONTRATO": "Tipo de Contrato",
             "ERF - BÁSICO": "Salario Mensual",
-            "FECHA DE INICIO DE CONTRATO": "Fecha Inicio Contrato",
-            "FECHA FIN DE CONTRATO": "Fecha Fin Contrato",
+            "FECHA INICIO CONTRATO": "Fecha Inicio Contrato",
+            "FECHA FIN CONTRATO": "Fecha Fin Contrato",
             "BONO ANUAL": "Bonificacion Decreto"
         }
         
@@ -334,12 +444,24 @@ def procesar_guatemala(f_inc, f_mae, f_req):
             "Gastos de Representacion", "Numero Horas por Mes", "N° DOCUMENTO"
         ]
         
+        #-----------------
+        # --- AJUSTES FINALES: ESTADO ---
+        if "Estado" in df_final.columns:
+            # Reemplazamos los valores exactos
+            map_estado = {"ACTIVO": "Activo", "CESADO": "Retirado"}
+            df_final["Estado"] = df_final["Estado"].replace(map_estado)
+        #-----------------
+
         df_final = df_final.reindex(columns=orden_final)
 
         # 7️⃣ Limpieza final
         df_final = df_final.drop(columns=["N° DOCUMENTO"])
 
         # Generación de Excel con autoajuste
+
+        # Limpieza Global: Reemplazar guiones "-" por vacío
+        df_final = df_final.replace("-", "", regex=False)
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, index=False, sheet_name='Empleos')
@@ -399,7 +521,7 @@ def procesar_expediente_guatemala(f_inc, f_mae):
             "Estado civil", "Fecha de nacimiento", "Nacionalidad", "País de nacimiento", 
             "Correo personal", "Número de celular", "Teléfono fijo", "Cuenta con cta bancaria", 
             "Tipo de banco para cta bancaria", "Numero de cta bancaria", "N° Documento IGSS", 
-            "N° Documento NIT", "Nombre de carrera", "Departamento residencia", "Municipio residencia", "Dirección"
+            "N° Documento NIT", "Nombre de carrera", "Departamento residencia", "Municipio residencia", "Dirección","Tiene IGSS"
         ]
         base_inc_per = df_inc_per[[c for c in cols_inc_gen if c in df_inc_per.columns]].copy()
         
@@ -408,15 +530,19 @@ def procesar_expediente_guatemala(f_inc, f_mae):
         base_inc_per["Nro. Documento"] = base_inc_per["Nro. Documento"].astype(str).str.strip()
         df_gen = pd.merge(base_mae_gen, base_inc_per, left_on="N° DOCUMENTO", right_on="Nro. Documento", how="inner")
         
-        # Separación de la columna "Nombres completos"
+        #Separación de la columna "Nombres completos"
         if "Nombres completos" in df_gen.columns:
-            # Dividimos usando el delimitador espacio. n=1 significa que solo cortará en el primer espacio
-            split_names = df_gen["Nombres completos"].astype(str).str.split(" ", n=1, expand=True)
+            # n=2 permite separar hasta 3 partes (Primer, Segundo y el resto)
+            split_names = df_gen["Nombres completos"].astype(str).str.split(" ", n=2, expand=True)
+            
             df_gen["Primer Nombre"] = split_names[0] if 0 in split_names.columns else ""
             df_gen["Segundo Nombre"] = split_names[1] if 1 in split_names.columns else ""
+            # Si existe una tercera parte, se asigna a Otros Nombres; si no, queda vacío
+            df_gen["Otros Nombres"] = split_names[2] if 2 in split_names.columns else ""
         else:
             df_gen["Primer Nombre"] = ""
             df_gen["Segundo Nombre"] = ""
+            df_gen["Otros Nombres"] = ""
             
         # Renombrado de Columnas
         map_gen = {
@@ -424,22 +550,88 @@ def procesar_expediente_guatemala(f_inc, f_mae):
             "Apellido paterno": "Primer Apellido", "Apellido materno": "Segundo Apellido",
             "Estado civil": "EstadoCivil", "País de nacimiento": "Pais Nacimiento",
             "Fecha de nacimiento": "Fecha Nacimiento", "Nacionalidad": "Pais Nacionalidad",
-            "Numero de cta bancaria": "Cuenta Banco", "Tipo de banco para cta bancaria": "Tipo Cuenta Banco",
-            "Cuenta con cta bancaria": "Banco", "Departamento residencia": "Departamento Residencia",
+            "Numero de cta bancaria": "Cuenta Banco", "Departamento residencia": "Departamento Residencia",
             "Municipio residencia": "Municipio Residencia", "Teléfono fijo": "Telefono",
             "Número de celular": "Celular", "Correo personal": "eMail Interno",
-            "Nombre de carrera": "Profesión (100 caracteres)", "N° Documento IGSS": "No Identificacion",
+            "Nombre de carrera": "Profesión (100 caracteres)", 
+            "Nro. Documento": "No Identificacion",          # <-- CAMBIO 1
+            "N° Documento IGSS": "No Seguro Social",        # <-- CAMBIO 2
             "N° Documento NIT": "No Identificacion Tributaria"
         }
+        # Lógica condicional para Banco y Tipo Cuenta Banco (Guatemala)
+        # 1. Por defecto, Banco viene de "Tipo de banco para cta bancaria"
+        df_gen["Banco"] = df_gen["Tipo de banco para cta bancaria"]
+        
+        # 2. Identificamos registros donde no hay cuenta (basado en la columna original)
+        mask_no_cuenta = df_gen["Cuenta con cta bancaria"].astype(str).str.upper() == "NO"
+        
+        # 3. Aplicamos condiciones: si es NO, limpiar. Si no, poner "Ahorro"
+        df_gen.loc[mask_no_cuenta, "Banco"] = ""
+        df_gen.loc[mask_no_cuenta, "Tipo Cuenta Banco"] = ""
+        df_gen.loc[~mask_no_cuenta, "Tipo Cuenta Banco"] = "Ahorro"
+
         df_gen = df_gen.rename(columns=map_gen)
+        # Formateo de Fecha de Nacimiento (DD/MM/YYYY) para Datos Generales
+        if "Fecha Nacimiento" in df_gen.columns:
+            df_gen["Fecha Nacimiento"] = pd.to_datetime(df_gen["Fecha Nacimiento"], errors='coerce').dt.strftime('%d/%m/%Y').fillna("")
         
         # Agregar columnas nuevas
-        df_gen["Otros Nombres"] = ""
+        #df_gen["Otros Nombres"] = ""
         df_gen["Apellido Casada"] = ""
-        df_gen["No Seguro Social"] = ""
-        df_gen["AFP"] = ""
+        #df_gen["No Seguro Social"] = ""
+        #df_gen["AFP"] = ""
         df_gen["NUP"] = ""
         df_gen["Digito Verificador"] = ""
+
+#------------------------------
+#------------------------------
+        
+        # --- MAPEOS GLOBALES: DATOS GENERALES ---
+        
+        # 1. Mapeo de Género
+        if "Genero" in df_gen.columns:
+            map_genero = {"MASCULINO": "M", "FEMENINO": "F"}
+            df_gen["Genero"] = df_gen["Genero"].str.upper().map(map_genero).fillna(df_gen["Genero"])
+
+        # 2. Mapeo de Países (Nacimiento y Nacionalidad) - CORREGIDO
+        map_paises = {
+            "el salvador": "sv", 
+            "guatemala": "gt", 
+            "nicaragua": "ni",
+            "honduras": "hn", 
+            "panama": "pa", 
+            "costa rica": "cr", 
+            "estados unidos": "us"
+        }
+        for col in ["Pais Nacimiento", "Pais Nacionalidad"]:
+            if col in df_gen.columns:
+                # Convertimos lo que viene del Excel a minúsculas y sin espacios para que haga "match" perfecto
+                df_gen[col] = df_gen[col].astype(str).str.lower().str.strip().map(map_paises).fillna(df_gen[col])
+
+        # 3. Mapeo de Tipo de Cuenta
+        if "Tipo Cuenta Banco" in df_gen.columns:
+            map_cuentas = {"Ahorro": "A", "Cuenta Corriente": "C"}
+            df_gen["Tipo Cuenta Banco"] = df_gen["Tipo Cuenta Banco"].map(map_cuentas).fillna(df_gen["Tipo Cuenta Banco"])
+        # 4. Mapeo de Estado Civil (Datos Generales)
+        if "EstadoCivil" in df_gen.columns:
+            map_estado_civil = {
+                "SOLTERO(A)": "S",
+                "CASADO(A)": "C",
+                "UNION LIBRE": "A",
+                "DIVORCIADO(A)": "D",
+                "VIUDO(A)": "V"
+            }
+            # Convertimos a mayúsculas y quitamos espacios para asegurar el match
+            df_gen["EstadoCivil"] = df_gen["EstadoCivil"].str.upper().str.strip().map(map_estado_civil).fillna(df_gen["EstadoCivil"])
+
+#------------------------------
+#------------------------------
+
+        df_gen["AFP"] = "" # Por defecto vacío
+        if "Tiene IGSS" in df_gen.columns:
+            # Validamos si es "SI" (limpiando posibles tildes o espacios para evitar errores)
+            mask_igss = df_gen["Tiene IGSS"].astype(str).str.upper().str.replace("Í", "I").str.strip() == "SI"
+            df_gen.loc[mask_igss, "AFP"] = "IGSS"
         
         # Orden y limpieza final
         orden_gen = [
@@ -464,8 +656,8 @@ def procesar_expediente_guatemala(f_inc, f_mae):
         
         cols_inc_fam = [
             "Número de Documento", "Vinculo", "N° de doc. de derechohabiente", 
-            "Fecha de nacimiento", "Nombres completos", "Sexo", "Nivel educativo", 
-            "Cargo y área en la que trabaja"
+            "Fecha de nacimiento", "Nombres completos", "Apellido paterno", # <-- Agregada
+            "Apellido materno", "Sexo", "Nivel educativo", "Cargo y área en la que trabaja" # <-- Agregada
         ]
         base_inc_fam = df_inc_fam[[c for c in cols_inc_fam if c in df_inc_fam.columns]].copy()
         
@@ -476,12 +668,49 @@ def procesar_expediente_guatemala(f_inc, f_mae):
         
         # Renombrado de Columnas
         map_dep = {
-            "COD PERSONAL": "CodigoEmpleado", "Vinculo": "Parentesco", "Nombres completos": "nombre", 
-            "Sexo": "Género", "Fecha de nacimiento": "FechaNacimiento", 
-            "N° de doc. de derechohabiente": "No Documento", "Cargo y área en la que trabaja": "LugarTrabajo", 
+            "COD PERSONAL": "CodigoEmpleado", 
+            "Vinculo": "Parentesco", 
+            # SE ELIMINÓ "Nombres completos": "nombre" PORQUE YA LA CREAMOS ARRIBA
+            "Sexo": "Género", 
+            "Fecha de nacimiento": "FechaNacimiento", 
+            "N° de doc. de derechohabiente": "No Documento", 
+            "Cargo y área en la que trabaja": "LugarTrabajo", 
             "Nivel educativo": "NivelEstudio"
         }
+
+        # Concatenación de nombre completo para Dependientes (Guatemala)
+        for col in ["Nombres completos", "Apellido paterno", "Apellido materno"]:
+            if col in df_dep.columns:
+                df_dep[col] = df_dep[col].astype(str).replace("-", "").str.strip()
+        
+        df_dep["nombre"] = (df_dep["Nombres completos"] + " " + 
+                            df_dep["Apellido paterno"] + " " + 
+                            df_dep["Apellido materno"]).str.replace(r'\s+', ' ', regex=True).str.strip()
+
         df_dep = df_dep.rename(columns=map_dep)
+
+#----------
+        # --- MAPEOS GLOBALES: DEPENDIENTES ---
+        
+        # 1. Mapeo de Género (ya lo tenías)
+        if "Género" in df_dep.columns:
+            map_genero_dep = {"MASCULINO": "M", "FEMENINO": "F"}
+            df_dep["Género"] = df_dep["Género"].str.upper().map(map_genero_dep).fillna(df_dep["Género"])
+
+        # 2. Mapeo de Estado Civil (Nuevo)
+        if "EstadoCivil" in df_dep.columns:
+            map_civil_dep = {
+                "SOLTERO(A)": "S",
+                "CASADO(A)": "C",
+                "UNION LIBRE": "A",
+                "DIVORCIADO(A)": "D",
+                "VIUDO(A)": "V"
+            }
+            df_dep["EstadoCivil"] = df_dep["EstadoCivil"].str.upper().str.strip().map(map_civil_dep).fillna(df_dep["EstadoCivil"])
+#------------
+        # Formateo de Fecha de Nacimiento (DD/MM/YYYY) para Dependientes
+        if "FechaNacimiento" in df_dep.columns:
+            df_dep["FechaNacimiento"] = pd.to_datetime(df_dep["FechaNacimiento"], errors='coerce').dt.strftime('%d/%m/%Y').fillna("")
         
         # Agregar columnas vacías
         df_dep["EstadoCivil"] = ""
@@ -501,6 +730,10 @@ def procesar_expediente_guatemala(f_inc, f_mae):
         # ========================================================
         # GENERACIÓN DEL EXCEL MULTI-HOJA
         # ========================================================
+        # Limpieza Global: Reemplazar guiones "-" por vacío
+        df_gen = df_gen.replace("-", "", regex=False)
+        df_dep = df_dep.replace("-", "", regex=False)
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_gen.to_excel(writer, index=False, sheet_name='Datos Generales')
@@ -537,7 +770,7 @@ def procesar_honduras(f_inc, f_mae, f_req):
 
         # 1️ Requerimiento – Datos Organizativos
         # Nota: Aquí usamos "TIPO DE CONV" específico de Honduras
-        cols_mantener_org = ["RQ", "MOTIVO", "PLANILLA", "TIPO DE CONV", "BONO ANUAL"]
+        cols_mantener_org = ["RQ", "CLASE DE CONTRATO", "MOTIVO", "BONO ANUAL"]
         req_org = df_org[[c for c in cols_mantener_org if c in df_org.columns]].copy()
 
         # 2️ Requerimiento – Candidatos seleccionados
@@ -557,9 +790,9 @@ def procesar_honduras(f_inc, f_mae, f_req):
 
         # 4️ Preparación del maestro de personal
         cols_mantener_mae = [
-            "COD PERSONAL", "COD. POSICION", "ESTADO", "FECHA DE BAJA", 
-            "FECHA FIN DE CONTRATO", "FECHA DE INICIO DE CONTRATO", 
-            "FECHA DE INGRESO AL GRUPO", "N° DOCUMENTO"
+            "COD PERSONAL", "COD POSICION", "ESTADO", "FECHA DE BAJA", 
+            "FECHA FIN CONTRATO", "FECHA INICIO CONTRATO", 
+            "FECHA INGRESO AL GRUPO", "N° DOCUMENTO", "CLASE CONTRATO"
         ]
         base_mae = df_mae[[c for c in cols_mantener_mae if c in df_mae.columns]].copy()
 
@@ -573,16 +806,16 @@ def procesar_honduras(f_inc, f_mae, f_req):
         # Renombrado de columnas (incluyendo TIPO DE CONV)
         mapeo_nombres = {
             "COD PERSONAL": "Código De Empleado",
-            "COD. POSICION": "Codigo Plaza",
+            "COD POSICION": "Codigo Plaza",
             "ESTADO": "Estado",
-            "PLANILLA": "Tipo de Planilla",
-            "FECHA DE INGRESO AL GRUPO": "Fecha Ingreso",
+            "CLASE DE CONTRATO": "Tipo de Planilla",
+            "FECHA INGRESO AL GRUPO": "Fecha Ingreso",
             "FECHA DE BAJA": "Fecha de Retiro",
             "MOTIVO": "Motivo de Retiro",
-            "TIPO DE CONV": "Tipo de Contrato",
+            "CLASE CONTRATO": "Tipo de Contrato",
             "ERF - BÁSICO": "Salario Mensual",
-            "FECHA DE INICIO DE CONTRATO": "Fecha Inicio Contrato",
-            "FECHA FIN DE CONTRATO": "Fecha Fin Contrato",
+            "FECHA INICIO CONTRATO": "Fecha Inicio Contrato",
+            "FECHA FIN CONTRATO": "Fecha Fin Contrato",
             "BONO ANUAL": "Bonificacion Decreto"
         }
         df_final = df_final.rename(columns=mapeo_nombres)
@@ -601,6 +834,14 @@ def procesar_honduras(f_inc, f_mae, f_req):
             "Fecha Inicio Contrato", "Fecha Fin Contrato", "Bonificacion Decreto", 
             "Gastos de Representacion", "Numero Horas por Mes", "N° DOCUMENTO"
         ]
+
+#---------------
+        # --- AJUSTES FINALES: ESTADO ---
+        if "Estado" in df_final.columns:
+            # Reemplazamos los valores exactos
+            map_estado = {"ACTIVO": "Activo", "CESADO": "Retirado"}
+            df_final["Estado"] = df_final["Estado"].replace(map_estado)
+#---------------
         
         df_final = df_final.reindex(columns=orden_final)
 
@@ -609,6 +850,11 @@ def procesar_honduras(f_inc, f_mae, f_req):
             df_final = df_final.drop(columns=["N° DOCUMENTO"])
 
         # Generación de Excel con autoajuste de celdas
+        
+        
+        # Limpieza Global: Reemplazar guiones "-" por vacío
+        df_final = df_final.replace("-", "", regex=False)
+        
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, index=False, sheet_name='Empleos')
@@ -701,6 +947,9 @@ def procesar_expediente_honduras(f_inc, f_mae):
             "Numero de cta. bancaria": "Cuenta Banco", "Tienes cta. en bancaria en BAC": "Banco"
         }
         df_gen = df_gen.rename(columns=map_gen)
+        # Formateo de Fecha de Nacimiento (DD/MM/YYYY) para Datos Generales
+        if "Fecha Nacimiento" in df_gen.columns:
+            df_gen["Fecha Nacimiento"] = pd.to_datetime(df_gen["Fecha Nacimiento"], errors='coerce').dt.strftime('%d/%m/%Y').fillna("")
         
         # Agregar columnas nuevas/vacías
         df_gen["Otros Nombres"] = ""
@@ -711,6 +960,47 @@ def procesar_expediente_honduras(f_inc, f_mae):
         df_gen["NUP"] = ""
         df_gen["Digito Verificador"] = ""
         
+        #--------------------------
+        # --- MAPEOS GLOBALES: DATOS GENERALES ---
+        
+        # 1. Mapeo de Género
+        if "Genero" in df_gen.columns:
+            map_genero = {"MASCULINO": "M", "FEMENINO": "F"}
+            df_gen["Genero"] = df_gen["Genero"].str.upper().map(map_genero).fillna(df_gen["Genero"])
+
+        # 2. Mapeo de Países (Nacimiento y Nacionalidad) - CORREGIDO
+        map_paises = {
+            "el salvador": "sv", 
+            "guatemala": "gt", 
+            "nicaragua": "ni",
+            "honduras": "hn", 
+            "panama": "pa", 
+            "costa rica": "cr", 
+            "estados unidos": "us"
+        }
+        for col in ["Pais Nacimiento", "Pais Nacionalidad"]:
+            if col in df_gen.columns:
+                # Convertimos lo que viene del Excel a minúsculas y sin espacios para que haga "match" perfecto
+                df_gen[col] = df_gen[col].astype(str).str.lower().str.strip().map(map_paises).fillna(df_gen[col])
+
+        # 3. Mapeo de Tipo de Cuenta
+        if "Tipo Cuenta Banco" in df_gen.columns:
+            map_cuentas = {"Ahorro": "A", "Cuenta Corriente": "C"}
+            df_gen["Tipo Cuenta Banco"] = df_gen["Tipo Cuenta Banco"].map(map_cuentas).fillna(df_gen["Tipo Cuenta Banco"])
+        # 4. Mapeo de Estado Civil (Datos Generales)
+        if "EstadoCivil" in df_gen.columns:
+            map_estado_civil = {
+                "SOLTERO(A)": "S",
+                "CASADO(A)": "C",
+                "UNION LIBRE": "A",
+                "DIVORCIADO(A)": "D",
+                "VIUDO(A)": "V"
+            }
+            # Convertimos a mayúsculas y quitamos espacios para asegurar el match
+            df_gen["EstadoCivil"] = df_gen["EstadoCivil"].str.upper().str.strip().map(map_estado_civil).fillna(df_gen["EstadoCivil"])
+        
+        #--------------------------
+
         # Orden y limpieza final (Asegurando las 29 columnas obligatorias)
         orden_gen = [
             "Pais Empresa", "Código De Empleado", "Primer Nombre", "Segundo Nombre", "Otros Nombres", 
@@ -752,6 +1042,30 @@ def procesar_expediente_honduras(f_inc, f_mae):
             "N° de doc. de beneficiario": "No Documento", "Nivel educativo": "NivelEstudio"
         }
         df_dep = df_dep.rename(columns=map_dep)
+
+        #-----------------------
+        # --- MAPEOS GLOBALES: DEPENDIENTES ---
+        
+        # 1. Mapeo de Género (ya lo tenías)
+        if "Género" in df_dep.columns:
+            map_genero_dep = {"MASCULINO": "M", "FEMENINO": "F"}
+            df_dep["Género"] = df_dep["Género"].str.upper().map(map_genero_dep).fillna(df_dep["Género"])
+
+        # 2. Mapeo de Estado Civil (Nuevo)
+        if "EstadoCivil" in df_dep.columns:
+            map_civil_dep = {
+                "SOLTERO(A)": "S",
+                "CASADO(A)": "C",
+                "UNION LIBRE": "A",
+                "DIVORCIADO(A)": "D",
+                "VIUDO(A)": "V"
+            }
+            df_dep["EstadoCivil"] = df_dep["EstadoCivil"].str.upper().str.strip().map(map_civil_dep).fillna(df_dep["EstadoCivil"])
+        #-----------------------
+
+        # Formateo de Fecha de Nacimiento (DD/MM/YYYY) para Dependientes
+        if "FechaNacimiento" in df_dep.columns:
+            df_dep["FechaNacimiento"] = pd.to_datetime(df_dep["FechaNacimiento"], errors='coerce').dt.strftime('%d/%m/%Y').fillna("")
         
         # Agregar columnas vacías
         for col in ["Parentesco", "EstadoCivil", "DependenciaEconomica", "Trabaja", "LugarTrabajo", "Estudia", "LugarEstudio"]:
@@ -768,6 +1082,11 @@ def procesar_expediente_honduras(f_inc, f_mae):
         # ========================================================
         # GENERACIÓN DEL EXCEL MULTI-HOJA
         # ========================================================
+        
+        # Limpieza Global: Reemplazar guiones "-" por vacío
+        df_gen = df_gen.replace("-", "", regex=False)
+        df_dep = df_dep.replace("-", "", regex=False)
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_gen.to_excel(writer, index=False, sheet_name='Datos Generales')
@@ -805,9 +1124,7 @@ def generar_excel_dummy(pais_origen, tipo_plantilla):
     return output.getvalue()
 
 
-# =========================================================
 # INTERFAZ DE USUARIO (FRONTEND)
-# =========================================================
 
 st.markdown(f"<h1 style='text-align: center; color: {color_naranja};'>Automatización de Plantillas de Personal</h1>", unsafe_allow_html=True)
 #st.markdown(f"<h4 style='text-align: center; color: {color_gris};'>Generador estandarizado de Empleos y Expediente</h4>", unsafe_allow_html=True)
@@ -902,3 +1219,54 @@ if sociedad_seleccionada:
 else:
     # Mensaje de ayuda mientras no se seleccione una sociedad
     st.info("👆 Por favor, selecciona una sociedad en el menú superior para habilitar la carga de archivos.")
+
+
+# --- SECCIÓN DE CONTACTO / SOPORTE AL FINAL DE LA PÁGINA ---
+st.divider() # Línea separadora sutil
+# 1. Franja verde corporativa
+st.markdown("""
+    <div style="background-color: #009A3F; padding: 10px 20px; border-radius: 5px; margin-bottom: 25px;">
+        <h4 style="color: white; margin: 0; font-family: sans-serif; font-size: 18px;">Si tienes alguna consulta, no dudes en contactarnos</h4>
+    </div>
+""", unsafe_allow_html=True)
+
+# 2. Función para crear el diseño de cada perfil
+def crear_tarjeta_perfil(nombre, cargo, correo, url_imagen):
+    return f"""
+    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+        <img src="{url_imagen}" style="border-radius: 50%; width: 50px; height: 50px; object-fit: cover; margin-right: 15px; border: 1px solid #ddd;">
+        <div style="line-height: 1.2;">
+            <a href="mailto:{correo}" style="text-decoration: none; color: #333; font-weight: bold; font-size: 14px;">{nombre}</a><br>
+            <span style="font-size: 11px; color: #666; text-transform: uppercase;">{cargo}</span>
+        </div>
+    </div>
+    """
+
+# 3. Creamos las 3 columnas en Streamlit
+col_soporte1, col_soporte2, col_soporte3 = st.columns(3)
+
+# 4. Llenamos cada columna con la información
+with col_soporte1:
+    st.markdown(crear_tarjeta_perfil(
+        nombre="Jampierre Balabarca Nicasio", 
+        cargo="Líder de People Data & Analytics", 
+        correo="LBalabarcaN@ransa.net", 
+        # Usamos un generador automático de iniciales si no tienes la URL de la foto real a la mano
+        url_imagen="https://ui-avatars.com/api/?name=Jampierre+Balabarca&background=009A3F&color=fff" 
+    ), unsafe_allow_html=True)
+
+with col_soporte2:
+    st.markdown(crear_tarjeta_perfil(
+        nombre="Fabian Martin Alvarado Vargas", 
+        cargo="Analista JR Desarrollo de Soluciones", 
+        correo="fFalvaradoV@ransa.net", 
+        url_imagen="https://ui-avatars.com/api/?name=Fabian+Alvarado&background=009A3F&color=fff"
+    ), unsafe_allow_html=True)
+
+with col_soporte3:
+    st.markdown(crear_tarjeta_perfil(
+        nombre="Kevin Yago Castrejon Sosa", 
+        cargo="Analista JR Mejora de Procesos", 
+        correo="KCastrejonS@ransa.net", 
+        url_imagen="https://ui-avatars.com/api/?name=Kevin+Castrejon&background=009A3F&color=fff"
+    ), unsafe_allow_html=True)
