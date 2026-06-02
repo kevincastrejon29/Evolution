@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import pandas as pdh
 import io
 
 #col_izq, col_centro, col_der = st.columns([1.5, 1, 1.5,])
